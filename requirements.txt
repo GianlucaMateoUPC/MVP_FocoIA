@@ -1,0 +1,9 @@
+streamlit
+python-dotenv
+torch
+torchvision
+huggingface_hub
+bcrypt
+pillow
+pandas
+numpy
