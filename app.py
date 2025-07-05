@@ -1,15 +1,14 @@
 # ==========================================
-# ✅ Foco IA COMPLETO + Chatbot Zephyr 7B + Pausa Activa REAL + Selector de Tema y Fondo Claro
+# ✅ Foco IA (compatible con Streamlit Cloud)
 # ==========================================
 
 import streamlit as st
 import threading
 import time
-import pyautogui
 import torch
 import torchvision.models as models
 import torchvision.transforms as transforms
-from win10toast import ToastNotifier
+from PIL import Image
 import os
 from datetime import datetime, timedelta
 import pandas as pd
@@ -30,10 +29,11 @@ client = InferenceClient(
 )
 
 # ==========================================
-# ✅ IA de enfoque (imagen)
+# ✅ IA de enfoque (imagen simulada)
 # ==========================================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_PATH = os.path.join(BASE_DIR, "mobilenet_foco_distraccion.pth")
+EJEMPLO_IMG = os.path.join(BASE_DIR, "ejemplo_foco.png")  # Imagen local simulada
 
 model = models.mobilenet_v2(weights=None)
 model.classifier[1] = torch.nn.Linear(model.classifier[1].in_features, 2)
@@ -46,7 +46,6 @@ transform = transforms.Compose([
 ])
 
 classes = ['distraccion', 'foco']
-toaster = ToastNotifier()
 
 # ==========================================
 # ✅ Estado global robusto
@@ -91,13 +90,14 @@ if "subtareas_dict" not in st.session_state:
     st.session_state.subtareas_dict = {}
 
 # ==========================================
-# ✅ Función monitoreo IA enfoque con PAUSA REAL
+# ✅ Función monitoreo IA enfoque (simulada)
 # ==========================================
 def monitoreo_ia(evento):
     tiempo_foco = 0
     while not evento.is_set():
-        screenshot = pyautogui.screenshot()
+        screenshot = Image.open(EJEMPLO_IMG)
         image = transform(screenshot).unsqueeze(0)
+
         with torch.no_grad():
             outputs = model(image)
             _, predicted = torch.max(outputs, 1)
@@ -105,33 +105,24 @@ def monitoreo_ia(evento):
         st.session_state.ultima_prediccion = clase
 
         if clase == "distraccion":
-            toaster.show_toast(
-                "🚨 Foco IA",
-                "¡Detecté distracción! Haz click en el chat para apoyo 👇",
-                duration=5
-            )
+            st.warning("🚨 ¡Detecté distracción! Haz click en el chat para apoyo 👇")
 
         tiempo_foco += 10
 
-        if tiempo_foco >= 60:  # 1 min demo
-            toaster.show_toast("⏸️ Pausa Activa",
-                               "¡Hora de una mini pausa! Relaja tus ojos y estírate.",
-                               duration=5)
+        if tiempo_foco >= 60:
+            st.info("⏸️ Pausa Activa: Relaja tus ojos y estírate.")
             st.balloons()
             evento.set()
-            time.sleep(60)  # Pausa real
-            # Reinicia monitoreo auto
+            time.sleep(60)
             st.session_state.monitoreo_event = threading.Event()
-            hilo_nuevo = threading.Thread(target=monitoreo_ia,
-                                          args=(st.session_state.monitoreo_event,),
-                                          daemon=True)
+            hilo_nuevo = threading.Thread(target=monitoreo_ia, args=(st.session_state.monitoreo_event,), daemon=True)
             hilo_nuevo.start()
             st.session_state.monitoreo_activo = True
             return
 
         time.sleep(10)
 
-    toaster.show_toast("✅ Foco IA", "Monitoreo IA detenido.", duration=3)
+    st.info("✅ Monitoreo IA detenido.")
 
 # ==========================================
 # ✅ Selector de Tema COMPLETO + Config UI
