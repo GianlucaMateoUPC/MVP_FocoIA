@@ -146,17 +146,54 @@ def verificar_credenciales(correo, contrasena):
 if "logueado" not in st.session_state:
     st.session_state.logueado = False
 
+# ======================
+# 🔐 LOGIN + REGISTRO
+# ======================
+def registrar_usuario(correo, contrasena):
+    conn = sqlite3.connect("usuarios.db")
+    cursor = conn.cursor()
+    contrasena_hash = bcrypt.hashpw(contrasena.encode('utf-8'), bcrypt.gensalt())
+    try:
+        cursor.execute("INSERT INTO usuarios (correo, contrasena_hash) VALUES (?, ?)", (correo, contrasena_hash))
+        conn.commit()
+        return True
+    except sqlite3.IntegrityError:
+        return False
+    finally:
+        conn.close()
+
+if "modo_registro" not in st.session_state:
+    st.session_state.modo_registro = False
+
 if not st.session_state.logueado:
-    st.title("🔐 Iniciar sesión")
-    correo = st.text_input("Correo")
-    contrasena = st.text_input("Contraseña", type="password")
-    if st.button("Ingresar"):
-        if verificar_credenciales(correo, contrasena):
-            st.session_state.logueado = True
-            st.success("✅ Bienvenido a Foco IA")
+    if st.session_state.modo_registro:
+        st.title("📝 Registro de nuevo usuario")
+        nuevo_correo = st.text_input("Correo nuevo")
+        nueva_contrasena = st.text_input("Contraseña nueva", type="password")
+        if st.button("Registrar"):
+            if registrar_usuario(nuevo_correo, nueva_contrasena):
+                st.success("✅ Registro exitoso. Ahora inicia sesión.")
+                st.session_state.modo_registro = False
+                st.rerun()
+            else:
+                st.error("❌ El correo ya está registrado.")
+        if st.button("⬅ Volver al login"):
+            st.session_state.modo_registro = False
             st.rerun()
-        else:
-            st.error("❌ Credenciales incorrectas")
+    else:
+        st.title("🔐 Iniciar sesión")
+        correo = st.text_input("Correo")
+        contrasena = st.text_input("Contraseña", type="password")
+        if st.button("Ingresar"):
+            if verificar_credenciales(correo, contrasena):
+                st.session_state.logueado = True
+                st.success("✅ Bienvenido a Foco IA")
+                st.rerun()
+            else:
+                st.error("❌ Credenciales incorrectas")
+        if st.button("🆕 ¿No tienes cuenta? Regístrate aquí"):
+            st.session_state.modo_registro = True
+            st.rerun()
     st.stop()
 
 # Selector real con más opciones
