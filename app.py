@@ -217,51 +217,38 @@ def guardar_horario_en_db(correo, horario_df):
     conn.commit()
     conn.close()
 
+# ==========================================
+# ✅ Selector de tema visual con fondo simulado
+# ==========================================
 tema = st.sidebar.selectbox(
     "🎨 Selecciona tu estilo visual:",
-    ["Clásico (blanco)", "Relajante (verde/azul)", "Energizante (naranja/rojo)", "Nocturno (oscuro)"]
+    ["Relajante (verde/azul)", "Energizante (naranja/rojo)", "Nocturno (oscuro)"]
 )
 
-# Aplica fondo y color de texto global
-if tema == "Clásico (blanco)":
-    st.markdown("""
+# Fondo simulado por HTML
+def aplicar_fondo_css(css_background, css_text_color):
+    st.markdown(f"""
         <style>
-        html, body, [class*="css"]  {
-            background-color: #ffffff;
-            color: #000000;
-        }
+        body {{
+            background: {css_background} !important;
+            color: {css_text_color} !important;
+        }}
+        .stApp {{
+            background: {css_background} !important;
+        }}
+        .block-container {{
+            background: transparent !important;
+        }}
         </style>
     """, unsafe_allow_html=True)
 
-elif tema == "Relajante (verde/azul)":
-    st.markdown("""
-        <style>
-        html, body, [class*="css"]  {
-            background: linear-gradient(to right, #a8edea, #fed6e3);
-            color: #004d40;
-        }
-        </style>
-    """, unsafe_allow_html=True)
-
+# Aplicar el fondo según el tema
+if tema == "Relajante (verde/azul)":
+    aplicar_fondo_css("linear-gradient(to right, #a8edea, #fed6e3)", "#004d40")
 elif tema == "Energizante (naranja/rojo)":
-    st.markdown("""
-        <style>
-        html, body, [class*="css"]  {
-            background: linear-gradient(to right, #fbd786, #f7797d);
-            color: #4e0303;
-        }
-        </style>
-    """, unsafe_allow_html=True)
-
+    aplicar_fondo_css("linear-gradient(to right, #fbd786, #f7797d)", "#4e0303")
 elif tema == "Nocturno (oscuro)":
-    st.markdown("""
-        <style>
-        html, body, [class*="css"]  {
-            background: #0e1117;
-            color: #fafafa;
-        }
-        </style>
-    """, unsafe_allow_html=True)
+    aplicar_fondo_css("#0e1117", "#fafafa")
 
 st.title("🎯 Foco IA + Chatbot Zephyr 7B")
 
