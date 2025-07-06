@@ -17,6 +17,7 @@ from huggingface_hub import InferenceClient
 from dotenv import load_dotenv
 import sqlite3
 import bcrypt
+import json
 
 # ==========================================
 # ✅ Token y cliente HF
@@ -33,7 +34,7 @@ client = InferenceClient(
 # ==========================================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_PATH = os.path.join(BASE_DIR, "mobilenet_foco_distraccion.pth")
-EJEMPLO_IMG = os.path.join(BASE_DIR, "ejemplo_foco.png")  # Imagen local simulada
+EJEMPLO_IMG = os.path.join(BASE_DIR, "ejemplo_foco.png")
 
 model = models.mobilenet_v2(weights=None)
 model.classifier[1] = torch.nn.Linear(model.classifier[1].in_features, 2)
@@ -75,7 +76,6 @@ if "racha_dias" not in st.session_state:
 if "ultima_fecha_punto" not in st.session_state:
     st.session_state.ultima_fecha_punto = ""
 
-# Calendario base
 dias_semana = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
 horas = [f"{h} AM" if h < 12 else f"{h-12} PM" if h > 12 else "12 PM" for h in range(7, 24)]
 
@@ -90,7 +90,6 @@ def monitoreo_ia(evento):
     while not evento.is_set():
         screenshot = Image.open(EJEMPLO_IMG)
         image = transform(screenshot).unsqueeze(0)
-
         with torch.no_grad():
             outputs = model(image)
             _, predicted = torch.max(outputs, 1)
@@ -101,7 +100,6 @@ def monitoreo_ia(evento):
             st.warning("🚨 ¡Detecté distracción! Haz click en el chat para apoyo 👇")
 
         tiempo_foco += 10
-
         if tiempo_foco >= 60:
             st.info("⏸️ Pausa Activa: Relaja tus ojos y estírate.")
             st.balloons()
@@ -112,13 +110,11 @@ def monitoreo_ia(evento):
             hilo_nuevo.start()
             st.session_state.monitoreo_activo = True
             return
-
         time.sleep(10)
-
     st.info("✅ Monitoreo IA detenido.")
 
 # ==========================================
-# ✅ Selector de Tema COMPLETO + Config UI
+# ✅ Configuración visual
 # ==========================================
 st.set_page_config(page_title="Foco IA + Zephyr 7B", layout="wide")
 
@@ -136,12 +132,6 @@ def verificar_credenciales(correo, contrasena):
         return bcrypt.checkpw(contrasena.encode('utf-8'), hash_guardado)
     return False
 
-if "logueado" not in st.session_state:
-    st.session_state.logueado = False
-
-# ======================
-# 🔐 LOGIN + REGISTRO
-# ======================
 def registrar_usuario(correo, contrasena):
     conn = sqlite3.connect("usuarios.db")
     cursor = conn.cursor()
@@ -155,6 +145,8 @@ def registrar_usuario(correo, contrasena):
     finally:
         conn.close()
 
+if "logueado" not in st.session_state:
+    st.session_state.logueado = False
 if "modo_registro" not in st.session_state:
     st.session_state.modo_registro = False
 
@@ -181,10 +173,24 @@ if not st.session_state.logueado:
             if verificar_credenciales(correo, contrasena):
                 st.session_state.logueado = True
                 st.session_state.usuario_correo = correo
-                cargar_horario_desde_db(correo)  # Cargar horario del usuario
-                
-                # Solo si no se cargó nada desde la base de datos
-                if "horario_grid" not in st.session_state or st.session_state.horario_grid.empty:
+
+                conn = sqlite3.connect("usuarios.db")
+                cursor = conn.cursor()
+                cursor.execute("SELECT horario FROM usuarios WHERE correo = ?", (correo,))
+                resultado = cursor.fetchone()
+                conn.close()
+
+                if resultado and resultado[0]:
+                    try:
+                        horario_cargado = pd.read_json(resultado[0])
+                        st.session_state.horario_grid = horario_cargado
+                    except Exception:
+                        st.session_state.horario_grid = pd.DataFrame(
+                            np.full((len(horas), len(dias_semana)), "", dtype=object),
+                            index=horas,
+                            columns=dias_semana
+                        )
+                else:
                     st.session_state.horario_grid = pd.DataFrame(
                         np.full((len(horas), len(dias_semana)), "", dtype=object),
                         index=horas,
@@ -193,7 +199,6 @@ if not st.session_state.logueado:
 
                 st.success("✅ Bienvenido a Foco IA")
                 st.rerun()
-                
             else:
                 st.error("❌ Credenciales incorrectas")
         if st.button("🆕 ¿No tienes cuenta? Regístrate aquí"):
@@ -201,8 +206,9 @@ if not st.session_state.logueado:
             st.rerun()
     st.stop()
 
-import json
-
+# ==========================================
+# ✅ Horario editable y persistente
+# ==========================================
 def guardar_horario_en_db(correo, horario_df):
     conn = sqlite3.connect("usuarios.db")
     cursor = conn.cursor()
@@ -211,20 +217,6 @@ def guardar_horario_en_db(correo, horario_df):
     conn.commit()
     conn.close()
 
-def cargar_horario_desde_db(correo):
-    conn = sqlite3.connect("usuarios.db")
-    cursor = conn.cursor()
-    cursor.execute("SELECT horario FROM usuarios WHERE correo = ?", (correo,))
-    resultado = cursor.fetchone()
-    conn.close()
-    if resultado and resultado[0]:
-        try:
-            horario_cargado = pd.read_json(resultado[0])
-            st.session_state.horario_grid = horario_cargado
-        except Exception:
-            pass  # En caso de error, ignora y usa grilla vacía
-
-# Selector real con más opciones
 tema = st.sidebar.selectbox(
     "🎨 Selecciona tu estilo visual:",
     ["Clásico (blanco)", "Relajante (verde/azul)", "Energizante (naranja/rojo)", "Nocturno (oscuro)"]
