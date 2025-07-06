@@ -28,4 +28,11 @@ def insertar_usuario(correo, contrasena):
 insertar_usuario("usuario1@example.com", "clave123")
 insertar_usuario("usuario2@example.com", "miclave456")
 
+# ⬇️ NUEVO BLOQUE para agregar la columna "horario" si no existe
+try:
+    cursor.execute("ALTER TABLE usuarios ADD COLUMN horario TEXT")
+    print("✅ Columna 'horario' agregada correctamente.")
+except sqlite3.OperationalError:
+    print("⚠️ La columna 'horario' ya existe.")
+
 conn.close()

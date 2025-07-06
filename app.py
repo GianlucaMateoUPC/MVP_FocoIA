@@ -79,13 +79,6 @@ if "ultima_fecha_punto" not in st.session_state:
 dias_semana = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
 horas = [f"{h} AM" if h < 12 else f"{h-12} PM" if h > 12 else "12 PM" for h in range(7, 24)]
 
-if "horario_grid" not in st.session_state:
-    st.session_state.horario_grid = pd.DataFrame(
-        np.full((len(horas), len(dias_semana)), "", dtype=object),
-        index=horas,
-        columns=dias_semana
-    )
-
 if "subtareas_dict" not in st.session_state:
     st.session_state.subtareas_dict = {}
 
@@ -187,14 +180,49 @@ if not st.session_state.logueado:
         if st.button("Ingresar"):
             if verificar_credenciales(correo, contrasena):
                 st.session_state.logueado = True
+                st.session_state.usuario_correo = correo
+                cargar_horario_desde_db(correo)  # Cargar horario del usuario
+                
+                # Solo si no se cargó nada desde la base de datos
+                if "horario_grid" not in st.session_state or st.session_state.horario_grid.empty:
+                    st.session_state.horario_grid = pd.DataFrame(
+                        np.full((len(horas), len(dias_semana)), "", dtype=object),
+                        index=horas,
+                        columns=dias_semana
+                    )
+
                 st.success("✅ Bienvenido a Foco IA")
                 st.rerun()
+                
             else:
                 st.error("❌ Credenciales incorrectas")
         if st.button("🆕 ¿No tienes cuenta? Regístrate aquí"):
             st.session_state.modo_registro = True
             st.rerun()
     st.stop()
+
+import json
+
+def guardar_horario_en_db(correo, horario_df):
+    conn = sqlite3.connect("usuarios.db")
+    cursor = conn.cursor()
+    horario_str = horario_df.to_json()
+    cursor.execute("UPDATE usuarios SET horario = ? WHERE correo = ?", (horario_str, correo))
+    conn.commit()
+    conn.close()
+
+def cargar_horario_desde_db(correo):
+    conn = sqlite3.connect("usuarios.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT horario FROM usuarios WHERE correo = ?", (correo,))
+    resultado = cursor.fetchone()
+    conn.close()
+    if resultado and resultado[0]:
+        try:
+            horario_cargado = pd.read_json(resultado[0])
+            st.session_state.horario_grid = horario_cargado
+        except Exception:
+            pass  # En caso de error, ignora y usa grilla vacía
 
 # Selector real con más opciones
 tema = st.sidebar.selectbox(
@@ -294,6 +322,9 @@ st.session_state.horario_grid = st.data_editor(
     use_container_width=True,
     num_rows="dynamic"
 )
+
+if st.session_state.get("usuario_correo"):
+    guardar_horario_en_db(st.session_state.usuario_correo, st.session_state.horario_grid)
 
 # ==========================================
 # ✅ Tareas con subtareas dinámicas
